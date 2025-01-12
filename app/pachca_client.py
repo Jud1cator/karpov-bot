@@ -4,9 +4,25 @@ import os
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 
-from models import Message
-
 logger = logging.getLogger(__name__)
+
+from pydantic import BaseModel
+
+
+class ThreadInfo(BaseModel):
+    id: int
+    chat_id: int
+
+
+class Message(BaseModel):
+    id: int
+    entity_type: str
+    entity_id: int
+    chat_id: int
+    content: str
+    user_id: int
+    created_at: datetime
+    thread: ThreadInfo | None
 
 
 class PachcaClient:
@@ -56,8 +72,39 @@ class PachcaClient:
                 return messages
             else:
                 page += 1
+    
+    def send_message(
+        self,
+        chat_id: int,
+        text: str,
+        parent_message_id: int | None = None,
+    ):
+        body = {
+            "message": {
+                "entity_id": chat_id,
+                "content": text,
+            }
+        }
+        if parent_message_id is not None:
+            body["message"]["parent_message_id"] = parent_message_id
+        response = requests.post(
+            url=f"{self.HOST}/messages",
+            headers=self._get_headers(),
+            json=body,
+        )
+        if response.status_code != 200:
+            logger.error(response.content.decode())
+            response.raise_for_status()
+        else:
+            logger.info(f"Message {text} successfuly sent.")
+
 
 if __name__ == "__main__":
     load_dotenv()
     client = PachcaClient(token=os.getenv("PACHCA_TOKEN"))
-    print(client.get_chats())
+    print(
+        client.send_message(
+            17770335,
+            "test",
+        )
+    )

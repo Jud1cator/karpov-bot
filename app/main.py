@@ -1,10 +1,21 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from datetime import datetime
+import re
+import os
+import dotenv
 
 import sqlite3
 
+from app.pachca_client import PachcaClient
+
+dotenv.load_dotenv()
+
 app = FastAPI()
+
+conn = sqlite3.connect("bot.db")
+db = conn.cursor()
+db.execute("CREATE TABLE IF NOT EXISTS tickets (issue_key, chat_id, message_id)")
 
 
 class ThreadInfo(BaseModel):
@@ -46,13 +57,32 @@ class PachcaMessage(BaseModel):
 
 
 class TrackerTicket(BaseModel):
-    id: int
+    issue_key: str
 
 
 @app.post("/pachca_message")
 def pachca_new_message(message: PachcaMessage):
-    return message
+    issue_key = re.findall(r"TEST-\d+", message.content)
+    if len(issue_key) > 0:
+        issue_key = issue_key[0]
+        conn = sqlite3.connect("bot.db")
+        cur = conn.cursor()
+        cur.execute(f"INSERT INTO tickets VALUES ('{issue_key}', {message.chat_id}, {message.id})")
+        conn.commit()
+    else:
+        raise ValueError("No issue key found")
 
 @app.post("/tracker_ticket")
 def tracker_ticket(ticket: TrackerTicket):
-    return ticket
+    conn = sqlite3.connect("bot.db")
+    cur = conn.cursor()
+    issue_info = cur.execute(f"SELECT chat_id, message_id FROM tickets WHERE issue_key = '{ticket.issue_key}'").fetchone()
+    if issue_info is None:
+        return f"Issue {ticket.issue_key} is not tracked"
+    chat_id, message_id = issue_info
+    pachca_client = PachcaClient(token=os.getenv("PACHCA_TOKEN"))
+    pachca_client.send_message(
+        chat_id=chat_id,
+        text=f"Ticket {ticket.issue_key} is closed!",
+        parent_message_id=message_id,
+    )
