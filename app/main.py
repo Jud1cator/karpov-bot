@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from datetime import datetime
 
+import sqlite3
+
 app = FastAPI()
 
 
@@ -29,6 +31,7 @@ class PachcaMessage(BaseModel):
         }
     }
     """
+
     type: str
     id: int
     event: str
@@ -42,6 +45,14 @@ class PachcaMessage(BaseModel):
     thread: ThreadInfo | None
 
 
+class TrackerTicket(BaseModel):
+    id: int
+
+
 @app.post("/pachca_message")
 def pachca_new_message(message: PachcaMessage):
     return message
+
+@app.post("/tracker_ticket")
+def tracker_ticket(ticket: TrackerTicket):
+    return ticket
