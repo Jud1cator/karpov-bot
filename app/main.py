@@ -15,7 +15,15 @@ app = FastAPI()
 
 conn = sqlite3.connect("bot.db")
 db = conn.cursor()
-db.execute("CREATE TABLE IF NOT EXISTS tickets (issue_key, chat_id, message_id)")
+db.execute(
+    """
+    CREATE TABLE IF NOT EXISTS tickets (
+        issue_key TEXT PRIMARY KEY,
+        chat_id INT,
+        message_id INT
+    )
+    """
+)
 
 
 class ThreadInfo(BaseModel):
@@ -24,25 +32,6 @@ class ThreadInfo(BaseModel):
 
 
 class PachcaMessage(BaseModel):
-    """
-    {
-    "type": "message", //тип объекта
-    "id": 4062313533, //идентификатор объекта
-    "event": "new", //тип события (new,update или delete)
-    "entity_type": "thread", //тип сущности, к которой относится объект (discussion, thread или user)
-    "entity_id": 14904221, //идентификатор сущности, к которой относится объект
-    "content": "/new разработка чата", //текст сообщения
-    "user_id": 18531312, //идентификатор отправителя
-    "created_at": "2023-01-26T15:25:16.000Z", //время создания сообщения
-    "chat_id": 34876123, //идентификатор чата, в котором находится сообщение
-    "parent_message_id": 4062313532, //идентификатор сообщения, к которому написан ответ (или null, если сообщение не является ответом)
-    "thread": { //объект с параметрами треда (или null, если это сообщение не относится к треду)
-        "message_id": 5631128658, //идентификатор сообщения, к которому был создан тред
-        "message_chat_id": 38926752 //идентификатор чата сообщения, к которому был создан тред
-        }
-    }
-    """
-
     type: str
     id: int
     event: str
@@ -58,31 +47,47 @@ class PachcaMessage(BaseModel):
 
 class TrackerTicket(BaseModel):
     issue_key: str
+    status: str
 
 
 @app.post("/pachca_message")
 def pachca_new_message(message: PachcaMessage):
     issue_key = re.findall(r"TEST-\d+", message.content)
-    if len(issue_key) > 0:
-        issue_key = issue_key[0]
-        conn = sqlite3.connect("bot.db")
-        cur = conn.cursor()
-        cur.execute(f"INSERT INTO tickets VALUES ('{issue_key}', {message.chat_id}, {message.id})")
-        conn.commit()
-    else:
+    if len(issue_key) == 0:
         raise ValueError("No issue key found")
+    issue_key = issue_key[0]
+    conn = sqlite3.connect("bot.db")
+    cur = conn.cursor()
+    cur.execute(
+        f"""
+        INSERT INTO tickets VALUES ('{issue_key}', {message.chat_id}, {message.id})
+        ON CONFLICT (issue_key) DO UPDATE SET
+            chat_id=excluded.chat_id,
+            message_id=excluded.message_id;
+        """
+    )
+    conn.commit()
+    pachca_client = PachcaClient(token=os.getenv("PACHCA_TOKEN"))
+    pachca_client.send_message(
+        chat_id=message.chat_id,
+        text=f"Я сообщу вам об изменении статуса тикета {issue_key}",
+        parent_message_id=message.id,
+    )
+
 
 @app.post("/tracker_ticket")
 def tracker_ticket(ticket: TrackerTicket):
     conn = sqlite3.connect("bot.db")
     cur = conn.cursor()
-    issue_info = cur.execute(f"SELECT chat_id, message_id FROM tickets WHERE issue_key = '{ticket.issue_key}'").fetchone()
+    issue_info = cur.execute(
+        f"SELECT chat_id, message_id FROM tickets WHERE issue_key = '{ticket.issue_key}'"
+    ).fetchone()
     if issue_info is None:
         return f"Issue {ticket.issue_key} is not tracked"
     chat_id, message_id = issue_info
     pachca_client = PachcaClient(token=os.getenv("PACHCA_TOKEN"))
     pachca_client.send_message(
         chat_id=chat_id,
-        text=f"Ticket {ticket.issue_key} is closed!",
+        text=f"Тикет {ticket.issue_key} был переведён в статус {ticket.status}",
         parent_message_id=message_id,
     )
