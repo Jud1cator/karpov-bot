@@ -1,8 +1,7 @@
-import requests
 import logging
-import os
 from datetime import datetime, timezone
-from dotenv import load_dotenv
+
+import requests
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
