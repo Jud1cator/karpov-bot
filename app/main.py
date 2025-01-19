@@ -95,6 +95,7 @@ def ticket_status_change(ticket: TicketStatusChange, config: AppConfig = Depends
     if len(issue_info) == 0:
         return f"Issue {ticket.issue_key} is not tracked"
     pachca_client = PachcaClient(token=config.pachca_token)
+    # TODO rewrite to async
     for chat_id, message_id in issue_info:
         pachca_client.send_message(
             chat_id=chat_id,
