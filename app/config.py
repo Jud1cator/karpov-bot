@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings
 
 class AppConfig(BaseSettings):
     pachca_token: str
-    tracker_queue_key: str = "TEST"
+    tracker_queue_key: str = "BACKLOG"
     tracker_status_list: set[str] = set(["Закрыт"])
 
 
