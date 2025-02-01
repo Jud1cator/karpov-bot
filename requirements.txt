@@ -1,7 +1,0 @@
-python-dotenv==1.0.1
-requests==2.32.3
-pydantic==2.10.4
-yandex_tracker_client==1.1
-fastapi[all]==0.115.6
-pyyaml==6.0.2
-pydantic-settings==2.7.1
