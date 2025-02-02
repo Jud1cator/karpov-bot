@@ -3,13 +3,8 @@ from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 
 
-class Base(DeclarativeBase):
-    pass
-
-
-class TicketSubscription(Base):
+class TicketSubscription(DeclarativeBase):
     __tablename__ = "ticket_subscription"
-    id: Mapped[int] = mapped_column(primary_key=True)
-    issue_key: Mapped[str]
-    chat_id: Mapped[int]
+    issue_key: Mapped[str] = mapped_column(primary_key=True)
+    chat_id: Mapped[int] = mapped_column(primary_key=True)
     message_id: Mapped[int]
